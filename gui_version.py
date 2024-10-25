@@ -34,6 +34,17 @@ word_file_path = None
 
 # Updated function to set cell border using proper namespaced attributes
 def set_cell_border(cell, **kwargs):
+    """
+        Sets the border of a table cell in a word document.
+
+        Parameters:
+        cell: The table cell to apply borders to.
+        kwargs: Keyword arguments specifying border width for 'top', 'left', 'bottom', and 'right' edges.
+
+        Usage:
+        Call this function with the table cell and specify the border widths in points.
+        For example, set_cell_border(cell, top=2, left=2, bottom=2, right=2).
+    """
     tc = cell._tc
     tcPr = tc.get_or_add_tcPr()
     for edge in ('top', 'left', 'bottom', 'right'):
