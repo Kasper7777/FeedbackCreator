@@ -1,26 +1,23 @@
-import sys
-from cx_Freeze import setup, Executable
-# This is a setup script for cx_Freeze to create an executable. Use 'python setup.py build' to run it.
-# Replace 'file.py' with the name of your script
-# Replace 'ico.ico' with the path to your icon file
-
-# Dependencies are automatically detected, but some modules need help.
-build_exe_options = {
-    "packages": ["os", "tkinter", "pandas", "docx", "reportlab"],  # Add any other packages you are using here
-    "include_files": ["mortor.ico"],  # Make sure your icon is in the same directory
-}
-
-# Base must be "Win32GUI" to suppress the console window for a GUI application on Windows.
-base = None
-if sys.platform == "win32":
-    base = "Win32GUI"
+from distutils.core import setup
+import py2exe
+import os
+# eg    'pyinstaller --onefile --windowed --icon=mortor.ico FeedbackCreator.py'
+# Explicitly define the script to be included
+script = os.path.join(os.path.dirname(__file__), 'FeedbackCreator.py')
 
 setup(
-    name="FeedbackCreator",
-    version="1.1",
-    description="A tool to generate feedback forms",
+    windows=[{
+        "script": script,
+        "icon_resources": [(0, "mortor.ico")]
+    }],
     options={
-        "build_exe": build_exe_options
+        "py2exe": {
+            "packages": ["os", "tkinter", "pandas", "docx", "reportlab"],  # Include necessary packages
+            "bundle_files": 1,  # Bundle everything into a single EXE
+            "compressed": True,  # Compress the library archive
+            "excludes": ["gui_version", "main", "main001", "main002", "gui_version01"],  # Exclude unnecessary modules
+        }
     },
-    executables=[Executable("FeedbackCreator.py", base=base, icon="mortor.ico")]
+    zipfile=None,  # Do not create a separate library zip file
+    py_modules=['FeedbackCreator'],  # Explicit module
 )
