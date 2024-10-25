@@ -22,5 +22,5 @@ setup(
     options={
         "build_exe": build_exe_options
     },
-    executables=[Executable("gui_version.py", base=base, icon="mortor.ico")]
+    executables=[Executable("FeedbackCreator.py", base=base, icon="mortor.ico")]
 )
