@@ -1,4 +1,3 @@
-#enjoy the code
 import os
 from datetime import datetime
 import pandas as pd
@@ -8,9 +7,14 @@ from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.shared import Pt, Inches
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
+from reportlab.lib.pagesizes import letter
+from reportlab.lib import colors
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph
+from reportlab.lib.styles import getSampleStyleSheet
 import tkinter as tk
 from tkinter import filedialog, messagebox
 from tkinter import ttk
+from docx2pdf import convert
 
 # Configuration settings
 config = {
@@ -34,17 +38,6 @@ word_file_path = None
 
 # Updated function to set cell border using proper namespaced attributes
 def set_cell_border(cell, **kwargs):
-    """
-        Sets the border of a table cell in a word document.
-
-        Parameters:
-        cell: The table cell to apply borders to.
-        kwargs: Keyword arguments specifying border width for 'top', 'left', 'bottom', and 'right' edges.
-
-        Usage:
-        Call this function with the table cell and specify the border widths in points.
-        For example, set_cell_border(cell, top=2, left=2, bottom=2, right=2).
-    """
     tc = cell._tc
     tcPr = tc.get_or_add_tcPr()
     for edge in ('top', 'left', 'bottom', 'right'):
@@ -52,13 +45,12 @@ def set_cell_border(cell, **kwargs):
         if edge_data:
             edge_element = OxmlElement(f'w:{edge}')
             edge_element.set(qn('w:val'), 'single')
-            edge_element.set(qn('w:sz'), str(edge_data * 8))  # width in eighths of a point
+            edge_element.set(qn('w:sz'), str(edge_data * 8))
             edge_element.set(qn('w:space'), '0')
             edge_element.set(qn('w:color'), '000000')
             tcPr.append(edge_element)
 
 
-# Helper function to add a centered heading
 def add_centered_heading(doc, text, font_size=18):
     paragraph = doc.add_paragraph()
     run = paragraph.add_run(text)
@@ -67,7 +59,6 @@ def add_centered_heading(doc, text, font_size=18):
     paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
 
-# Helper function to extract the last table from a .docx document
 def extract_last_table_from_docx(doc_path):
     doc = Document(doc_path)
     if doc.tables:
@@ -76,7 +67,6 @@ def extract_last_table_from_docx(doc_path):
 
 
 def append_table_to_document(target_doc, table):
-    """Append the given table to the target document without modifications."""
     new_table = target_doc.add_table(rows=len(table.rows), cols=len(table.columns))
     new_table.autofit = False
     for row_idx, row in enumerate(table.rows):
@@ -84,7 +74,6 @@ def append_table_to_document(target_doc, table):
             new_cell = new_table.cell(row_idx, cell_idx)
             new_cell.text = cell.text
             set_cell_border(new_cell, top=1, left=1, bottom=1, right=1)
-            # Copying formatting
             for paragraph in cell.paragraphs:
                 new_p = new_cell.paragraphs[0]
                 for run in paragraph.runs:
@@ -98,34 +87,25 @@ def append_table_to_document(target_doc, table):
                 new_p.alignment = paragraph.alignment
 
 
-def create_feedback_form(student_name, student_mark, feedback, extra_table):
+def create_feedback_form_in_docx(student_name, student_mark, feedback, extra_table, output_format):
+    doc_file_name = f'Assignment_Feedback_Form_{student_name}.docx'
     doc = Document()
-
-    # Set author to tutor's name
     core_properties = doc.core_properties
     core_properties.author = config['tutor_name']
-
-    # Set document margins
     sections = doc.sections
     for section in sections:
         section.top_margin = Inches(1)
         section.bottom_margin = Inches(1)
         section.left_margin = Inches(1)
         section.right_margin = Inches(1)
-
-    # Title
     add_centered_heading(doc, 'ASSIGNMENT FEEDBACK FORM', font_size=config['font_sizes']['title'])
     add_centered_heading(doc, '2024-25', font_size=config['font_sizes']['year'])
-
-    # Add Student Info table
     table = doc.add_table(rows=3, cols=4)
     table.autofit = False
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
     for row in table.rows:
         for cell in row.cells:
             cell.width = Inches(1.5)
-
-    # Set student information cells
     table.cell(0, 0).text = 'STUDENT:'
     table.cell(0, 1).text = student_name
     table.cell(0, 2).text = 'TUTOR:'
@@ -138,15 +118,10 @@ def create_feedback_form(student_name, student_mark, feedback, extra_table):
     table.cell(2, 1).text = config['assignment_title']
     table.cell(2, 2).text = '% of module:'
     table.cell(2, 3).text = config['percent_of_module']
-
-    # Set table borders
     for row in table.rows:
         for cell in row.cells:
             set_cell_border(cell, top=1, left=1, bottom=1, right=1)
-
-    doc.add_paragraph()  # Add a break
-
-    # Add "Overall Comment" box
+    doc.add_paragraph()
     add_centered_heading(doc, 'OVERALL COMMENT', font_size=config['font_sizes']['comment'])
     comment_table = doc.add_table(rows=1, cols=1)
     comment_table.autofit = False
@@ -154,15 +129,12 @@ def create_feedback_form(student_name, student_mark, feedback, extra_table):
     comment_table.cell(0, 0).width = Inches(6)
     comment_table.cell(0, 0).text = feedback if feedback else ' '
     set_cell_border(comment_table.cell(0, 0), top=1, left=1, bottom=1, right=1)
-    doc.add_paragraph()  # Add a break
-
-    # Add Marks and Date table
+    doc.add_paragraph()
     table = doc.add_table(rows=1, cols=3)
     table.autofit = False
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
     for cell in table.rows[0].cells:
         cell.width = Inches(2)
-
     table.cell(0, 0).text = config['percentage_mark_label']
     mark_paragraph = table.cell(0, 1).paragraphs[0]
     mark_run = mark_paragraph.add_run(str(student_mark))
@@ -170,34 +142,30 @@ def create_feedback_form(student_name, student_mark, feedback, extra_table):
     table.cell(0, 1).paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
     table.cell(0, 2).text = 'Date:'
     table.cell(0, 2).paragraphs[0].add_run(datetime.now().strftime('%Y-%m-%d')).bold = True
-
-    # Set table borders for Marks and Date table
     for row in table.rows:
         for cell in row.cells:
             set_cell_border(cell, top=1, left=1, bottom=1, right=1)
-
-    doc.add_paragraph()  # Add a break
-
-    # Footer message
+    doc.add_paragraph()
     footer = doc.add_paragraph()
     footer_run = footer.add_run(
         "NB All marks are provisional until confirmed by a formally constituted Board of Examiners")
     footer_run.font.size = Pt(config['font_sizes']['footer'])
     footer.alignment = WD_ALIGN_PARAGRAPH.CENTER
-
-    doc.add_paragraph()  # Add a break
-
-    # Add a page break after the footer message
+    doc.add_paragraph()
     doc.add_page_break()
-
-    # Append the extra table if it exists
     if extra_table:
         append_table_to_document(doc, extra_table)
+    doc.save(doc_file_name)
+    print(f"Saved: {doc_file_name}")
 
-    # Save the document
-    file_name = f'Assignment_Feedback_Form_{student_name}.docx'
-    doc.save(file_name)
-    print(f"Saved: {file_name}")
+    # Convert to PDF if needed
+    if output_format == 'PDF':
+        pdf_file_name = doc_file_name.replace('.docx', '.pdf')
+        convert(doc_file_name, pdf_file_name)
+        print(f"Converted to PDF: {pdf_file_name}")
+        return pdf_file_name
+
+    return doc_file_name
 
 
 def process_files():
@@ -210,17 +178,16 @@ def process_files():
     if word_checkbox_var.get() and word_file_path:
         extra_table = extract_last_table_from_docx(word_file_path)
 
-    # Read student names, marks, and feedback from the Excel file
     try:
         df = pd.read_excel(excel_file_path)
         student_data = df.iloc[:, [0, 1, 2]]
 
-        # Create a feedback form for each student
         for index, row in student_data.iterrows():
             student_name = row.iloc[0]
             student_mark = row.iloc[1]
             feedback = row.iloc[2]
-            create_feedback_form(student_name, student_mark, feedback, extra_table)
+            output_format = output_format_var.get()
+            create_feedback_form_in_docx(student_name, student_mark, feedback, extra_table, output_format)
     except Exception as e:
         messagebox.showerror("Error", f"Failed to process files: {e}")
 
@@ -304,7 +271,6 @@ excel_button.pack(pady=5)
 excel_label = tk.Label(file_frame, text="No Excel file selected")
 excel_label.pack(pady=5)
 
-# Optional Word file selection
 word_checkbox_var = tk.BooleanVar(value=False)
 word_checkbox = tk.Checkbutton(file_frame, text="Include Rubric (Word Doc)", variable=word_checkbox_var,
                                command=toggle_word_file_selection)
@@ -315,6 +281,12 @@ word_button.pack(pady=5)
 word_label = tk.Label(file_frame, text="No Word file selected", state=tk.DISABLED)
 word_label.pack(pady=5)
 
+# Output format selection
+output_format_var = tk.StringVar(value="Word")
+tk.Label(file_frame, text="Output Format:").pack(pady=5)
+output_format_menu = ttk.OptionMenu(file_frame, output_format_var, "Word", "Word", "PDF")
+output_format_menu.pack(pady=5)
+
 # Process button
 process_button = tk.Button(root, text="Process Files", command=process_files)
 process_button.pack(pady=10)
@@ -323,7 +295,7 @@ process_button.pack(pady=10)
 footer_frame = tk.Frame(root)
 footer_frame.pack(pady=10)
 
-link = ttk.Label(footer_frame, text="Visit our website: kasper7777.github.io", foreground="blue", cursor="hand2")
+link = ttk.Label(footer_frame, text="Visit my website: kasper7777.github.io", foreground="blue", cursor="hand2")
 link.pack(side="top")
 link.bind("<Button-1>", open_website)
 
